@@ -1,0 +1,19 @@
+{
+	"tickets": [
+		{ "number": 5 },
+		{ "number": 4 },
+		{ "number": 3 },
+		{ "number": 2 },
+		{ "number": 1, "desktop": 1 }
+	],
+	"lastFour": [
+		{ "number": 4 },
+		{ "number": 3 },
+		{ "number": 2 },
+		{ "number": 1 }
+	],
+	"today": "07/05/2023",
+	"lastTicket": { "number": 5 },
+	"peekTicket": { "number": 1 },
+	"number": 5
+}
