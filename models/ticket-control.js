@@ -1,177 +1,138 @@
 const fs = require("fs");
 const path = require("path");
-const { isNumberObject } = require("util/types");
-
-class Ticket {
-	#number;
-	#desktop;
-
-	constructor() {
-		this.#desktop;
-		this.#number;
-	}
-
-	get number() {
-		return this.#number;
-	}
-
-	get desktop() {
-		return this.#desktop;
-	}
-
-	set number(num) {
-		this._number = num;
-	}
-
-	set desktop(desk) {
-		this._desktop = desk;
-	}
-
-	toJSON() {
-		return { number: this._number, desktop: this._desktop };
-	}
-}
 
 class TicketControl {
-	static number = 0; // Number to assign to tickets of the day (Like a counter)
+	#tickets = new Array();
+	static #number = 0;
+	#filePath = path.join(__dirname, "../db/tickets.json");
+	#existFile;
+	#today;
 
 	constructor() {
-		this.tickets = []; // List of all tickets of today
-		this.lastFour = []; // Last four tickets
-		this.lastTicket = null;
-		this.peekTicket = null;
-		this.today = new Date().toLocaleDateString("en-GB"); // Today Date
-		this.dbPath = path.join(__dirname, "../db/tickets.json"); // Saving path
-
+		this.#today = new Date().toLocaleDateString("en-GB");
 		this.init();
 	}
 
+	// INITIALIZER
 	init() {
 		try {
-			// Try to get data from tickets.json
-			const existFileData = fs.existsSync(this.dbPath);
-
-			if (existFileData) {
+			this.#existFile = fs.existsSync(this.#filePath);
+			const today = new Date().toLocaleDateString("en-GB");
+			if (this.#existFile) {
 				const data = JSON.parse(
-					fs.readFileSync(this.dbPath, { encoding: "utf-8" })
+					fs.readFileSync(this.#filePath, {
+						encoding: "utf-8",
+					})
 				);
-
-				if (data && this.today === data.today) {
+				if (data.today === today) {
 					this.tickets = data.tickets;
-					this.lastFour = data.lastFour;
-					this.lastTicket = data.lastTicket;
-					this.peekTicket = data.peekTicket;
-					TicketControl.number = data.number;
+					TicketControl.#number = data.tickes.length === 0 ? 0 : data.number;
+					return;
 				}
-
-				return;
 			}
 
 			throw new Error();
 		} catch (error) {
-			// If error exists print it to console
-			console.log(
-				"El archivo tickets.json no existe. Se creará uno nuevo en ../db/tickets.json"
-			);
-			const newData = {
-				tickets: this.tickets,
-				lastFour: this.lastFour,
-				today: this.today,
-				lastTicket: this.lastTicket,
-				peekTicket: this.peekTicket,
-				number: TicketControl.number,
-			};
-			fs.writeFileSync(this.dbPath, JSON.stringify(newData));
+			this.tickets = [];
+
+			this.persistTickets(this.tickets);
 		}
 	}
 
-	createTicket() {
-		const newTicket = new Ticket();
-
-		newTicket.number = ++TicketControl.number;
-
-		this.enqueueTicket(newTicket.toJSON());
-
-		return newTicket.toJSON();
-	}
-
-	enqueueTicket(ticket) {
-		this.tickets.unshift(ticket);
-		this.lastTicket = ticket;
-		if (this.lastFour.length < 4) {
-			this.lastFour.unshift(ticket);
-		}
-		this.peekTicket =
-			this.lastFour.slice(-1).length != 0 ? this.lastFour.slice(-1)[0] : null;
-		this.saveDB();
-	}
-
-	dequeueTicket() {
-		if (this.tickets.length !== 0) {
-			this.tickets.pop();
-			this.lastFour.pop();
-			this.lastTicket = this.lastFour[0];
-			this.lastFour = this.tickets
-				.slice(-1, -4)
-				.map(ticket => ticket !== undefined && ticket);
-			this.peekTicket = this.lastFour[0];
-			this.saveTickets();
-		}
-	}
-
-	saveDB() {
-		const data = {
-			tickets: this.tickets,
-			lastFour: this.lastFour,
-			today: this.today,
-			lastTicket: this.lastTicket,
-			peekTicket: this.peekTicket,
-			number: TicketControl.number,
-		};
-		fs.writeFileSync(this.dbPath, JSON.stringify(data));
-	}
-
-	setDesktop(desktop) {
-		if (this.tickets.length !== 0)
-			this.tickets.slice(-1)[0].desktop = Number(desktop);
-
-		if (this.lastFour.length < 4) {
-			this.lastFour = this.tickets.slice(-1, -4);
-		}
-		this.saveDB();
-	}
-
-	get peekTicket() {
-		return this._peekTicket;
-	}
-
-	set peekTicket(ticket) {
-		this._peekTicket = ticket;
-	}
-
-	get lastTicket() {
-		return this._lastTicket;
-	}
-
-	set lastTicket(ticket) {
-		this._lastTicket = ticket;
-	}
-
-	get lastFour() {
-		return this._lastFour;
-	}
-
-	set lastFour(lastFour) {
-		this._lastFour = lastFour;
-	}
-
+	// GETTERS AND SETTERS
 	get tickets() {
-		return this._tickets;
+		return this.#tickets;
 	}
 
-	set tickets(__tickets) {
-		this._tickets = __tickets;
+	set tickets(value) {
+		this.#tickets = value;
+		return this.#tickets;
+	}
+
+	// METHODS
+
+	persistTickets(tickets) {
+		const data = {
+			tickets: tickets ? tickets : this.#tickets,
+			number: TicketControl.#number,
+			today: this.#today,
+		};
+		fs.writeFileSync(this.#filePath, JSON.stringify(data));
+		console.log("tickets.json modificado.");
+	}
+
+	enqueueTicket() {
+		const newTicket = { number: ++TicketControl.#number };
+		this.#tickets.push(newTicket);
+
+		this.persistTickets();
+		return this.tickets;
+	}
+
+	dequeueTicket(ticketNumber) {
+		this.tickets = this.#tickets.filter(
+			ticket => ticket.number !== ticketNumber
+		);
+
+		this.persistTickets();
+		return this.tickets;
+	}
+
+	attendTicket(desktopNumber) {
+		const ticket = this.#tickets.findIndex(
+			ticket => ticket.desktop === undefined
+		);
+
+		this.#tickets[ticket].desktop = desktopNumber;
+
+		this.persistTickets();
+
+		return this.tickets[ticket];
+	}
+
+	getLastFourTickets() {
+		const lastTicketArray = this.#tickets
+			.slice(0, 4)
+			.filter(ticket => ticket !== undefined);
+
+		return lastTicketArray.reverse();
+	}
+
+	getNonAttendedTickets() {
+		const nonAttendedTickets = this.#tickets.filter(
+			ticket => ticket.desktop === undefined
+		);
+
+		return nonAttendedTickets;
+	}
+
+	getTicketByDesktop(desktopNumber) {
+		const nonAttendedTickets = this.#tickets.filter(
+			ticket => ticket.desktop === desktopNumber
+		);
+
+		return nonAttendedTickets[0];
+	}
+
+	getFirstTicket() {
+		const lastTicketArray = this.#tickets.slice(-1);
+
+		if (lastTicketArray !== 0) {
+			return lastTicketArray[0];
+		}
+
+		return;
+	}
+
+	getLastTicket() {
+		const lastTicket = this.#tickets.slice(-1);
+		console.log(lastTicket);
+		return lastTicket[0];
+	}
+
+	getQueueLength() {
+		return this.#tickets.length;
 	}
 }
 
-module.exports = { TicketControl };
+module.exports = TicketControl;

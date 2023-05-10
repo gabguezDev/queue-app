@@ -9,30 +9,18 @@ socket.on("connect", () => {
 
 	socket.emit("last-ticket");
 
-	// Wait for last-ticket event to receive ticket.number param
 	socket.on("last-ticket", ticket => {
-		if (!ticket) {
-			newTicketLabel.innerHTML = "¡No hay tickets!";
-			return;
-		}
-		showLastCreatedTicket(ticket.number);
+		newTicketLabel.innerHTML = ticket
+			? `Ticket n° ${ticket.number}`
+			: `No hay tickets`;
 	});
 
-	// Emi create-ticket socket event when button is clicked
 	newTicketButton.addEventListener("click", () => {
-		socket.emit("create-ticket");
-	});
-
-	// Receive ticket object
-	socket.on("create-ticket", ticket => {
-		showLastCreatedTicket(ticket.number);
+		socket.emit("new-ticket");
+		socket.emit("last-ticket");
 	});
 
 	socket.on("disconnect", () => {
 		console.log("Desconectado del servidor");
 	});
 });
-
-function showLastCreatedTicket(ticketNumber) {
-	newTicketLabel.innerHTML = `Ticket ${ticketNumber}`;
-}

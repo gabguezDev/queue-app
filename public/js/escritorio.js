@@ -1,71 +1,72 @@
-const desktopNumber = window.location.search.slice(-1);
+const desktop = {
+	number: window.location.search.slice(-1),
+	titleEl: document.querySelector("h1"),
+	actualTicketEl: document.querySelector("#actual-ticket-desktop"),
+	queueEl: document.querySelector("#queue-desktop"),
+	queueCountEl: document.querySelector("#lblPendientes"),
+	noTicketsEl: document.querySelector("#no-tickets"),
+	attendingToEl: document.querySelector("#attending-to"),
+	nextTicketButtonEl: document.querySelector("#next-ticket"),
+};
 
-const desktopTitle = document.querySelector("h1");
+desktop.titleEl.innerHTML = `Escritorio ${desktop.number}`;
 
-const actualTicketDesktop = document.querySelector("#actual-ticket-desktop");
-const remainTicketDesktop = document.querySelector("#remain-tickets-desktop");
-
-const nextTicketButton = document.querySelector("#next-ticket");
-const attendingToLabel = document.querySelector("#attending-to");
-
-const queueDesktop = document.querySelector("#queue-desktop");
-const noTickets = document.querySelector("#no-tickets");
-const lblPendientes = document.querySelector("#lblPendientes");
-
-desktopTitle.innerHTML = `Escritorio ${desktopNumber}`;
-
+//Socket Handler
 const socket = io();
 
+//On Socket CONNECT
 socket.on("connect", () => {
 	console.log("client connected");
 
-	socket.emit("queue");
+	// Ask for tickets queue
+	socket.emit("get-queue");
 
-	socket.on("queue", tickets => {
-		const queue = tickets;
+	socket.emit("actual-attending-ticket", Number(desktop.number));
 
-		const ticketsQueue = ticketWithNoDesktop(queue);
-		console.log(ticketsQueue);
-		if (ticketsQueue.length !== 0) noTickets.className = "d-none";
-
-		queueDesktop.innerHTML = null;
-		queueDesktop.append(
-			...ticketsQueue.map(ticket => (ticket !== undefined ? ticket : ""))
-		);
-		lblPendientes.innerHTML = ticketsQueue.length;
-
-		if (
-			queue[0].desktop !== undefined &&
-			queue[0].desktop === Number(desktopNumber)
-		) {
-			actualTicketDesktop.innerHTML = `Ticket ${queue[0].number}`;
-		} else {
-			attendingToLabel.innerHTML =
-				"Presione el botón de abajo para atender un ticket.";
+	socket.on("actual-attending-ticket", actualTicket => {
+		if (actualTicket) {
+			desktop.actualTicketEl.innerHTML = `Ticket ${actualTicket.number}`;
 		}
 	});
 
-	nextTicketButton.addEventListener("click", () => {
-		socket.emit("desktop", desktopNumber);
+	// Listen get-queue event
+	socket.on("get-queue", nonAttendedTickets => {
+		if (nonAttendedTickets.length !== 0) {
+			desktop.queueEl.innerHTML = "";
+			const els = nonAttendedTickets.map(ticket => {
+				const ticketDiv = document.createElement("div");
+				ticketDiv.id = `ticket-${ticket.number}`;
+				ticketDiv.className = "py-1 my-2";
+				ticketDiv.innerHTML = `Ticket ${ticket.number}`;
+				return ticketDiv;
+			});
+			desktop.queueEl.append(...els);
+			return;
+		}
+		desktop.nextTicketButtonEl.setAttribute("disabled", true);
 	});
 
+	// Listen to click event at nextTicketButton
+	desktop.nextTicketButtonEl.addEventListener("click", () => {
+		const finishAttendingTicket = Number(
+			desktop.actualTicketEl.innerHTML.split(" ")[1]
+		);
+		console.log(finishAttendingTicket);
+		socket.emit(
+			"attend-next-ticket",
+			Number(desktop.number),
+			finishAttendingTicket
+		);
+	});
+
+	socket.on("attend-next-ticket", attendingToTicket => {
+		console.log(attendingToTicket);
+		socket.emit("get-queue");
+		desktop.actualTicketEl.innerHTML = `Ticket ${attendingToTicket.number}`;
+	});
+
+	//On Socket DISCONNECT
 	socket.on("disconnect", () => {
 		console.log("Client disconnected");
 	});
 });
-
-function ticketWithNoDesktop(tickets) {
-	return tickets.reverse().map(ticket => {
-		if (ticket.desktop === undefined) {
-			let el = document.createElement("p");
-			el.setAttribute("id", `ticket-${ticket.number}`);
-			el.className =
-				"fw-bold mx-2 my-1 p-3 bg-white border border-1 border-black";
-
-			el.innerHTML = `Ticket n° ${ticket.number}`;
-			return el;
-		} else {
-			return undefined;
-		}
-	});
-}

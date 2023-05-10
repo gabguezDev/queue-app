@@ -1,36 +1,52 @@
-const { TicketControl } = require("../models/ticket-control");
+const TicketControl = require("../models/ticket-control");
 
 const ticketManager = new TicketControl();
 
 const socketController = socket => {
 	console.log("Cliente conectado", socket.id);
 
-	socket.on("last-ticket", () => {
-		socket.emit("last-ticket", ticketManager.lastTicket);
-	});
-
-	socket.on("create-ticket", () => {
-		const newTicket = ticketManager.createTicket();
-		socket.emit("create-ticket", newTicket);
-		socket.emit("last-ticket", ticketManager.lastTicket);
-	});
-
+	// Listen to last-four event
 	socket.on("last-four", () => {
-		socket.emit("last-four", ticketManager.lastFour);
+		socket.emit("last-four", ticketManager.getLastFourTickets());
 	});
 
-	socket.on("disconnect", () => {
-		console.log("Cliente desconectado", socket.id);
+	// Listen to get-queue event and emit tickets array
+	socket.on("get-queue", () =>
+		socket.emit("get-queue", ticketManager.getNonAttendedTickets())
+	);
+
+	// Listen to new-ticket event and emit tickets array
+	socket.on("new-ticket", () => {
+		ticketManager.enqueueTicket();
+		socket.emit("last-ticket", ticketManager.getLastTicket());
 	});
 
-	socket.on("queue", () => {
-		socket.emit("queue", ticketManager.tickets);
+	socket.on("last-ticket", () => {
+		socket.emit("last-ticket", ticketManager.getLastTicket());
 	});
 
-	socket.on("desktop", desktop => {
-		ticketManager.setDesktop(desktop);
-		socket.emit("queue", ticketManager.tickets);
+	socket.on("attend-next-ticket", (desktopNumber, ticketToDequeue) => {
+		if (ticketToDequeue !== undefined || typeof ticketToDequeue !== NaN) {
+			ticketManager.dequeueTicket(ticketToDequeue);
+		}
+		socket.emit(
+			"attend-next-ticket",
+			ticketManager.attendTicket(desktopNumber)
+		);
 	});
+
+	socket.on("actual-attending-ticket", desktopNumber =>
+		socket.emit(
+			"actual-attending-ticket",
+			ticketManager.getTicketByDesktop(desktopNumber)
+		)
+	);
+
+	socket.on("dequeue-ticket", (ticketToDequeue, desktopNumber) => {
+		ticketManager.dequeueTicket(ticketToDequeue, desktopNumber);
+	});
+
+	socket.on("disconnect", () => console.log("Client disconnected", socket.id));
 };
 
 module.exports = {
